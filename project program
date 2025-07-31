@@ -1,0 +1,62 @@
+import gradio as gr
+from transformers import pipeline
+import random
+
+caption_generator = pipeline("text-generation", model="gpt2")
+sentiment_pipeline = pipeline("sentiment-analysis")
+
+emoji_dict = {
+    "positive": ["😊", "🌟", "🔥", "💪", "🚀", "✨"],
+    "negative": ["😢", "😞", "💔", "😠", "😓"],
+    "neutral": ["🙂", "😐", "🧐", "🤔", "😶"]
+}
+
+tone_prefix = {
+    "Witty": "Make it clever and humorous:",
+    "Motivational": "Make it inspiring and uplifting:",
+    "Poetic": "Make it artistic and lyrical:"
+}
+
+def get_emojis(text):
+    label = sentiment_pipeline(text)[0]['label'].lower()
+    return ''.join(random.sample(emoji_dict.get(label, ["🙂"]), 3))
+
+def get_hashtags(prompt, platform, count):
+    words = prompt.lower().split()
+    tags = ["#" + word.replace(" ", "") for word in words if len(word) > 3]
+
+    platform_tags = {
+        "Instagram": ["#instadaily", "#igers", "#picoftheday"],
+        "LinkedIn": ["#career", "#leadership", "#networking"],
+        "Twitter": ["#tweet", "#trending", "#news"]
+    }
+
+    return " ".join(tags[:count] + random.sample(platform_tags[platform], 2))
+
+def generate_post(prompt, platform, tone, tag_count):
+    styled_prompt = f"{tone_prefix[tone]} {prompt}"
+    caption = caption_generator(styled_prompt, max_length=50, num_return_sequences=1)[0]['generated_text']
+    emojis = get_emojis(caption)
+    hashtags = get_hashtags(prompt, platform, tag_count)
+    preview = f"{caption.strip()} {emojis} {hashtags}"
+    return caption.strip(), emojis, hashtags, preview
+
+interface = gr.Interface(
+    fn=generate_post,
+    inputs=[
+        gr.Textbox(label="Enter keyword or theme"),
+        gr.Radio(["Instagram", "LinkedIn", "Twitter"], label="Choose Platform"),
+        gr.Radio(["Witty", "Motivational", "Poetic"], label="Select Tone"),
+        gr.Slider(3, 10, value=5, step=1, label="Number of Hashtags")
+    ],
+    outputs=[
+        gr.Textbox(label="Generated Caption", show_copy_button=True),
+        gr.Textbox(label="Emojis", show_copy_button=True),
+        gr.Textbox(label="Hashtags", show_copy_button=True),
+        gr.Textbox(label="Final Social Media Post Preview", show_copy_button=True)
+    ],
+    title="🚀 AI-Powered Social Media Caption Generator",
+    description="Create witty, poetic, or motivational posts with emojis and hashtags! Powered by Hugging Face + Gradio."
+)
+
+interface.launch()
